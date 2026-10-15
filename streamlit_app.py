@@ -23,7 +23,7 @@ st_autorefresh(interval=3000, key="datarefresh")
 @st.cache_resource
 def init_supabase() -> Client:
     # Lấy thông tin URL và KEY bảo mật đã cấu hình trong mục Secrets
-    url: str = st.secrets["supabase"]["url"]
+    url: str = st.secrets["supabase"]["url"].strip("/")
     key: str = st.secrets["supabase"]["key"]
     return create_client(url, key)
 
