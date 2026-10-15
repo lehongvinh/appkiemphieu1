@@ -12,37 +12,58 @@ from supabase import create_client, Client
 # 1. CẤU HÌNH TRANG WEB & TỰ ĐỘNG LÀM MỚI (REAL-TIME)
 # ==========================================
 st.set_page_config(page_title="Hệ thống Kiểm phiếu tự động", layout="wide")
-st.title("📊 Hệ thống Kiểm phiếu Tự động (Đồng bộ đa máy - Supabase)")
+st.title("📊 Hệ thống Kiểm phiếu Tự động (Đồng bộ đa máy - Siêu tốc)")
 
-# Tự động quét và làm mới giao diện sau mỗi 3000 mili-giây (3 giây)
+# Tự động quét giao diện sau mỗi 3 giây. Chu kỳ này cũng được dùng để đẩy dữ liệu đệm lên Cloud
 st_autorefresh(interval=3000, key="datarefresh")
+
+# Khởi tạo bộ nhớ đệm cục bộ trên trình duyệt để hỗ trợ bấm dồn dập không trễ
+if "phieu_cho_xu_ly" not in st.session_state:
+    st.session_state.phieu_cho_xu_ly = {}
 
 # ==========================================
 # 2. KẾT NỐI CƠ SỞ DỮ LIỆU ĐÁM MÂY SUPABASE
 # ==========================================
 @st.cache_resource
 def init_supabase() -> Client:
-    # Lấy thông tin URL và KEY bảo mật đã cấu hình trong mục Secrets
     url: str = st.secrets["supabase"]["url"].strip("/")
     key: str = st.secrets["supabase"]["key"]
     return create_client(url, key)
 
 supabase: Client = init_supabase()
 
-# Đọc dữ liệu từ bảng 'thong_so' (Bản ghi id=1)
+# Đọc dữ liệu cấu hình thông số tổng
 try:
     response_ts = supabase.table("thong_so").select("*").eq("id", 1).execute()
     if response_ts.data:
         ts_data = response_ts.data[0]
     else:
-        # Nếu chưa có bản ghi id=1, tự động tạo mới
         insert_res = supabase.table("thong_so").insert({"id": 1, "vong": "Vòng đề cử", "phiu_phat": 0, "phiu_thu": 0, "phiu_huy": 0, "phiu_hop_le": 0, "phiu_trang": 0}).execute()
         ts_data = insert_res.data[0]
 except Exception as e:
     st.error(f"Lỗi kết nối bảng thong_so: {e}")
     st.stop()
 
-# Đọc danh sách ứng viên từ bảng 'ung_vien'
+# ĐỒNG BỘ NGẦM: Trước khi đọc bảng ứng viên, kiểm tra xem máy này có phiếu đệm nào chưa đẩy lên Cloud không
+if st.session_state.phieu_cho_xu_ly:
+    try:
+        for ten_uv, so_luong_them in list(st.session_state.phieu_cho_xu_ly.items()):
+            if so_luong_them > 0:
+                # Lấy số phiếu hiện tại trên Cloud của ứng viên đó
+                res_check = supabase.table("ung_vien").select("so_phieu").eq("ten", ten_uv).execute()
+                if res_check.data:
+                    phieu_hien_tai = res_check.data[0]["so_phieu"]
+                    # Cộng dồn lượng phiếu đệm tích lũy và cập nhật một lần duy nhất lên Cloud
+                    supabase.table("ung_vien").update({
+                        "so_phieu": phieu_hien_tai + so_luong_them,
+                        "vong": ts_data.get('vong', 'Vòng đề cử')
+                    }).eq("ten", ten_uv).execute()
+        # Đẩy dữ liệu thành công thì xóa sạch hàng đợi chờ xử lý của máy này
+        st.session_state.phieu_cho_xu_ly = {}
+    except Exception:
+        pass # Nếu mạng lỗi, giữ lại hàng đệm để chu kỳ sau đẩy tiếp
+
+# Đọc danh sách ứng viên mới nhất từ hệ thống trực tuyến
 try:
     response_uv = supabase.table("ung_vien").select("*").execute()
     danh_sach_uv = response_uv.data if response_uv.data else []
@@ -90,12 +111,11 @@ with col_save_ts:
 
 with col_reset_system:
     if st.button("🧹 BẮT ĐẦU CUỘC BỎ PHIẾU MỚI", use_container_width=True, type="secondary"):
-        # Xóa toàn bộ dữ liệu ứng viên cũ trên hàng loạt
         supabase.table("ung_vien").delete().neq("ten", "").execute()
-        # Đưa thông số cấu hình về mặc định (phiu_hop_le về 0 theo mong muốn của bạn)
         supabase.table("thong_so").update({
             "vong": "Vòng đề cử", "phiu_phat": 0, "phiu_thu": 0, "phiu_huy": 0, "phiu_hop_le": 0, "phiu_trang": 0
         }).eq("id", 1).execute()
+        st.session_state.phieu_cho_xu_ly = {}
         st.toast("Đã xóa hết dữ liệu cũ! Hãy tải file Excel mới.", icon="🗑️")
         st.rerun()
 
@@ -108,7 +128,6 @@ if not danh_sach_uv:
             df = pd.read_excel(uploaded_file)
             ten_ung_vien = df.iloc[:, 0].dropna().tolist()
             
-            # Đẩy danh sách ứng viên lên Supabase
             for ten in ten_ung_vien:
                 supabase.table("ung_vien").upsert({"ten": str(ten).strip(), "so_phieu": 0, "vong": vong}).execute()
             st.success(f"Đã tải thành công {len(ten_ung_vien)} ứng viên lên hệ thống Cloud!")
@@ -136,10 +155,14 @@ if danh_sach_uv:
     
     col_nhap_lieu, col_bxh = st.columns(2)
     
+    # Cập nhật hiển thị số phiếu bằng cách cộng thêm lượng phiếu đệm đang chờ xử lý của riêng máy này
     df_kq = pd.DataFrame(danh_sach_uv)
-    
-    # Định dạng chuẩn lại tên cột khớp với Supabase
     df_kq.columns = ["ten", "so_phieu", "vong"]
+    
+    for idx, row in df_kq.iterrows():
+        ten_uv = row["ten"]
+        if ten_uv in st.session_state.phieu_cho_xu_ly:
+            df_kq.at[idx, "so_phieu"] += st.session_state.phieu_cho_xu_ly[ten_uv]
     
     if tong_mau_so > 0:
         df_kq["Tỷ Lệ %"] = (df_kq["so_phieu"] * 100 / tong_mau_so).round(2)
@@ -168,15 +191,14 @@ if danh_sach_uv:
                     st.write("*Click chọn đúng tên bên dưới để cộng phiếu:*")
                     for uv_goi_y in goi_y_khop[:5]:
                         ten_goi_y = uv_goi_y["ten"]
-                        so_phieu_hien_tai = uv_goi_y["so_phieu"]
                         
                         if st.button(f"👤 {ten_goi_y}", key=f"btn_{ten_goi_y}", use_container_width=True):
-                            # Tương tác cộng phiếu thời gian thực bảo mật lên Supabase
-                            supabase.table("ung_vien").update({
-                                "so_phieu": so_phieu_hien_tai + 1,
-                                "vong": vong
-                            }).eq("ten", ten_goi_y).execute()
-                            st.toast(f"✅ Đã ghi nhận thêm 1 phiếu cho: {ten_goi_y}!", icon="🎉")
+                            # TỐI ƯU HÓA: Ghi nhận phiếu vào bộ nhớ tạm cục bộ ngay lập tức (Không đợi mạng Internet)
+                            if ten_goi_y not in st.session_state.phieu_cho_xu_ly:
+                                st.session_state.phieu_cho_xu_ly[ten_goi_y] = 0
+                            st.session_state.phieu_cho_xu_ly[ten_goi_y] += 1
+                            
+                            st.toast(f"✅ Đã lưu tạm 1 phiếu cho: {ten_goi_y}! (Hệ thống sẽ đồng bộ lên Cloud sau ít giây)", icon="🎉")
                             st.rerun()
                 else:
                     st.caption("❌ Không tìm thấy ứng viên nào khớp.")
@@ -186,7 +208,7 @@ if danh_sach_uv:
             st.subheader("🏆 Bảng xếp hạng hiển thị")
             st.dataframe(df_hien_thi, use_container_width=True, height=400)
 
-     # ==========================================
+    # ==========================================
     # 5. CHỨC NĂNG XUẤT FILE EXCEL ĐẸP
     # ==========================================
     def export_to_excel_pretty(df_source):
@@ -247,8 +269,7 @@ if danh_sach_uv:
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         use_container_width=True
     )
-
-# ==========================================
+    # ==========================================
 # 6. MỤC 3 - PHẦN CHỈNH SỬA VÀ ĐIỀU CHỈNH DỮ LIỆU
 # ==========================================
 if danh_sach_uv:
@@ -258,7 +279,7 @@ if danh_sach_uv:
     danh_sach_ten_sua = [uv["ten"] for uv in danh_sach_uv]
     ten_can_sua = st.selectbox("Chọn ứng viên cần sửa số liệu hoặc xóa hẳn khỏi danh sách:", [""] + danh_sach_ten_sua, key="select_sua")
     
-    if ten_can_sua:
+    if len(ten_can_sua) > 0:
         info_hien_tai = next(item for item in danh_sach_uv if item["ten"] == ten_can_sua)
         col_info, col_action = st.columns(2)
         
@@ -272,10 +293,14 @@ if danh_sach_uv:
             with col_btn_sua:
                 if st.button("💾 Lưu thay đổi số phiếu", use_container_width=True, type="primary"):
                     supabase.table("ung_vien").update({"so_phieu": so_phieu_moi}).eq("ten", ten_can_sua).execute()
+                    if ten_can_sua in st.session_state.phieu_cho_xu_ly:
+                        del st.session_state.phieu_cho_xu_ly[ten_can_sua]
                     st.success(f"Đã cập nhật số phiếu của {ten_can_sua} thành {so_phieu_moi} lên Cloud!")
                     st.rerun()
             with col_btn_xoa:
                 if st.button("🗑️ Xóa ứng viên này", use_container_width=True):
                     supabase.table("ung_vien").delete().eq("ten", ten_can_sua).execute()
+                    if ten_can_sua in st.session_state.phieu_cho_xu_ly:
+                        del st.session_state.phieu_cho_xu_ly[ten_can_sua]
                     st.warning(f"Đã xóa hoàn toàn ứng viên {ten_can_sua} khỏi cơ sở dữ liệu trực tuyến!")
                     st.rerun()
