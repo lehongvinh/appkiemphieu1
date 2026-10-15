@@ -276,58 +276,61 @@ if danh_sach_uv:
     st.write("---")
     st.header("3. Điều chỉnh dữ liệu")
     
-    # Tạo một khung hộp nhỏ bao quanh cho giao diện gọn gàng
-    with st.container(border=True):
-        # Ô gõ tìm kiếm chữ không dấu độc lập
-        tu_khoa_tim_kiem = st.text_input(
-            "Gõ tên ứng viên cần sửa/xóa (Có thể gõ chữ KHÔNG DẤU):", 
-            placeholder="Ví dụ: hoang, tuan, diem..."
-        )
+    # Bước 1: Tạo danh sách từ khóa ngầm là "tên không dấu" để selectbox tự động lọc được khi gõ
+    # Để tránh trùng lặp nếu có người trùng tên, ta đính kèm thêm ID ẩn bằng ký tự đặc biệt "||"
+    danh_sach_ngam_selectbox = [""]
+    ban_do_dich_nguoc_ten = {"": ""} # Bộ từ điển dùng để dịch ngược chuỗi không dấu thành tên gốc có dấu
+    
+    for uv in danh_sach_uv:
+        ten_co_dau = uv["ten"]
+        ten_khong_dau_ngam = unidecode(ten_co_dau).lower().strip()
         
-        # Tiến hành lọc ngầm danh sách ứng viên dựa trên từ khóa không dấu
-        danh_sach_loc_selectbox = [""]
-        if tu_khoa_tim_kiem:
-            chuoi_tim_kiem_khong_dau = unidecode(tu_khoa_tim_kiem).lower().strip()
-            for uv in danh_sach_uv:
-                ten_uv_khong_dau = unidecode(uv["ten"]).lower().strip()
-                # Nếu từ khóa khớp với tên ngầm không dấu, thêm tên gốc CO' DẤU vào danh sách chọn
-                if chuoi_tim_kiem_khong_dau in ten_uv_khong_dau:
-                    danh_sach_loc_selectbox.append(uv["ten"])
-        else:
-            # Nếu không gõ gì, hiển thị đầy đủ danh sách tên gốc có dấu
-            danh_sach_loc_selectbox += [uv["ten"] for uv in danh_sach_uv]
-            
-        # Hiển thị Selectbox - Droplist lúc này chỉ chứa và hiển thị DUY NHẤT tên gốc có dấu
-        ten_can_sua = st.selectbox(
-            "Click vào đây để chọn chính xác ứng viên cần sửa/xóa:",
-            danh_sach_loc_selectbox,
-            key="select_sua"
-        )
+        # Tạo chuỗi định danh ngầm
+        chuoi_khoa_ngam = f"{ten_khong_dau_ngam}||{ten_co_dau}"
         
-        # Hiển thị khối chức năng cập nhật số liệu khi đã chọn được ứng viên cụ thể
-        if len(ten_can_sua) > 0:
-            st.write("---")
-            info_hien_tai = next(item for item in danh_sach_uv if item["ten"] == ten_can_sua)
-            col_info, col_action = st.columns(2)
+        danh_sach_ngam_selectbox.append(chuoi_khoa_ngam)
+        ban_do_dich_nguoc_ten[chuoi_khoa_ngam] = ten_co_dau
+
+    # Bước 2: Hàm định dạng hiển thị. Khi hiển thị lên droplist, hàm này sẽ ép selectbox
+    # CẮT BỎ hoàn toàn từ khóa ngầm và chỉ hiện duy nhất họ tên tiếng Việt có dấu sạch sẽ.
+    def hien_thi_ten_co_dau_sach_se(chuoi_khoa):
+        return ban_do_dich_nguoc_ten.get(chuoi_khoa, chuoi_khoa)
+
+    # Bước 3: Hiển thị 1 O^ CHỌN DUY NHẤT. Bạn gõ không dấu thoải mái, màn hình chỉ hiện tên có dấu sạch 100%
+    lua_chon_khoa_ngam = st.selectbox(
+        "Gõ tên ứng viên (không dấu) hoặc cuộn chuột để chọn người cần sửa/xóa:",
+        danh_sach_ngam_selectbox,
+        format_func=hien_thi_ten_co_dau_sach_se,
+        key="select_sua"
+    )
+    
+    # Bước 4: Tiến hành hiển thị chức năng Sửa/Xóa khi đã chọn được ứng viên cụ thể
+    if len(lua_chon_khoa_ngam) > 0:
+        # Lấy lại tên gốc có dấu chính xác từ bản đồ dịch ngược
+        ten_can_sua = ban_do_dich_nguoc_ten[lua_chon_khoa_ngam]
+        
+        st.write("")
+        info_hien_tai = next(item for item in danh_sach_uv if item["ten"] == ten_can_sua)
+        col_info, col_action = st.columns(2)
+        
+        with col_info:
+            st.info(f"Ứng viên đang chọn: **{ten_can_sua}**  \nSố phiếu hiện tại trên hệ thống Cloud: **{info_hien_tai['so_phieu']}** phiếu.")
+            so_phieu_moi = st.number_input("Nhập chính xác số phiếu thay thế mới:", min_value=0, value=int(info_hien_tai["so_phieu"]), step=1)
             
-            with col_info:
-                st.info(f"Ứng viên đang chọn: **{ten_can_sua}**  \nSố phiếu hiện tại trên hệ thống Cloud: **{info_hien_tai['so_phieu']}** phiếu.")
-                so_phieu_moi = st.number_input("Nhập chính xác số phiếu thay thế mới:", min_value=0, value=int(info_hien_tai["so_phieu"]), step=1)
-                
-            with col_action:
-                st.write("")
-                col_btn_sua, col_btn_xoa = st.columns(2)
-                with col_btn_sua:
-                    if st.button("💾 Lưu thay đổi số phiếu", use_container_width=True, type="primary"):
-                        supabase.table("ung_vien").update({"so_phieu": so_phieu_moi}).eq("ten", ten_can_sua).execute()
-                        if ten_can_sua in st.session_state.phieu_cho_xu_ly:
-                            del st.session_state.phieu_cho_xu_ly[ten_can_sua]
-                        st.success(f"Đã cập nhật số phiếu của {ten_can_sua} thành {so_phieu_moi} lên Cloud!")
-                        st.rerun()
-                with col_btn_xoa:
-                    if st.button("🗑️ Xóa ứng viên này", use_container_width=True):
-                        supabase.table("ung_vien").delete().eq("ten", ten_can_sua).execute()
-                        if ten_can_sua in st.session_state.phieu_cho_xu_ly:
-                            del st.session_state.phieu_cho_xu_ly[ten_can_sua]
-                        st.warning(f"Đã xóa hoàn toàn ứng viên {ten_can_sua} khỏi cơ sở dữ liệu trực tuyến!")
-                        st.rerun()
+        with col_action:
+            st.write("")
+            col_btn_sua, col_btn_xoa = st.columns(2)
+            with col_btn_sua:
+                if st.button("💾 Lưu thay đổi số phiếu", use_container_width=True, type="primary"):
+                    supabase.table("ung_vien").update({"so_phieu": so_phieu_moi}).eq("ten", ten_can_sua).execute()
+                    if ten_can_sua in st.session_state.phieu_cho_xu_ly:
+                        del st.session_state.phieu_cho_xu_ly[ten_can_sua]
+                    st.success(f"Đã cập nhật số phiếu của {ten_can_sua} thành {so_phieu_moi} lên Cloud!")
+                    st.rerun()
+            with col_btn_xoa:
+                if st.button("🗑️ Xóa ứng viên này", use_container_width=True):
+                    supabase.table("ung_vien").delete().eq("ten", ten_can_sua).execute()
+                    if ten_can_sua in st.session_state.phieu_cho_xu_ly:
+                        del st.session_state.phieu_cho_xu_ly[ten_can_sua]
+                    st.warning(f"Đã xóa hoàn toàn ứng viên {ten_can_sua} khỏi cơ sở dữ liệu trực tuyến!")
+                    st.rerun()
