@@ -276,31 +276,31 @@ if danh_sach_uv:
     st.write("---")
     st.header("3. Điều chỉnh dữ liệu")
     
-    # Bước 1: Tạo danh sách hiển thị đặc biệt: "Tên gốc (ten khong dau)" để selectbox tự lọc được khi gõ không dấu
-    danh_sach_hien_thi_selectbox = [""]
-    ban_do_ten_goc = {} # Dùng để dò ngược lại tên chính xác có dấu sau khi người dùng chọn
+    # Bước 1: Chuẩn bị danh sách ứng viên gốc (chỉ chứa tên có dấu sạch sẽ)
+    danh_sach_ten_goc = [""] + [uv["ten"] for uv in danh_sach_uv]
     
-    for uv in danh_sach_uv:
-        ten_co_dau = uv["ten"]
-        ten_khong_dau = unidecode(ten_co_dau).lower().strip()
-        # Chuỗi hiển thị trong thanh chọn sẽ có dạng: "Nguyễn Văn Tuấn (nguyen van tuan)"
-        chuoi_hien_thi = f"{ten_co_dau} ({ten_khong_dau})"
-        
-        danh_sach_hien_thi_selectbox.append(chuoi_hien_thi)
-        ban_do_ten_goc[chuoi_hien_thi] = ten_co_dau
+    # Bước 2: Tạo bộ từ điển tìm kiếm ngầm bằng cách chuyển tên gốc sang không dấu
+    # Streamlit sẽ dùng bộ từ điển này để đối chiếu dữ liệu khi bạn gõ chữ tìm kiếm
+    tu_dien_tim_kiem_ngam = {
+        uv["ten"]: f"{uv['ten']} {unidecode(uv['ten']).lower().strip()}"
+        for uv in danh_sach_uv
+    }
+    tu_dien_tim_kiem_ngam[""] = "" # Thêm khoảng trống dòng đầu tiên
 
-    # Bước 2: Hiển thị thanh chọn duy nhất. Bạn có thể gõ "tuan", "hoang" không dấu vào đây, droplist sẽ tự lọc
-    lua_chon_selectbox = st.selectbox(
+    # Bước 3: Hàm định dạng hiển thị. Khi gõ chữ, selectbox sẽ tìm theo chuỗi ngầm này
+    def tim_kiem_thong_minh_ngam(ten_lua_chon):
+        return tu_dien_tim_kiem_ngam.get(ten_lua_chon, ten_lua_chon)
+
+    # Bước 4: Hiển thị thanh chọn duy nhất sạch sẽ, không còn chữ trong dấu ngoặc ()
+    ten_can_sua = st.selectbox(
         "Gõ tên ứng viên (không dấu) hoặc cuộn chuột để chọn người cần sửa/xóa:",
-        danh_sach_hien_thi_selectbox,
+        danh_sach_ten_goc,
+        format_func=tim_kiem_thong_minh_ngam,
         key="select_sua"
     )
     
-    # Bước 3: Nếu người dùng đã chọn một ứng viên từ droplist
-    if len(lua_chon_selectbox) > 0:
-        # Lấy lại tên gốc có dấu chính xác từ bản đồ chuyển đổi
-        ten_can_sua = ban_do_ten_goc[lua_chon_selectbox]
-        
+    # Bước 5: Tiến hành hiển thị chức năng Sửa/Xóa khi đã chọn được ứng viên
+    if len(ten_can_sua) > 0:
         st.write("")
         info_hien_tai = next(item for item in danh_sach_uv if item["ten"] == ten_can_sua)
         col_info, col_action = st.columns(2)
