@@ -186,7 +186,7 @@ if danh_sach_uv:
             st.subheader("🏆 Bảng xếp hạng hiển thị")
             st.dataframe(df_hien_thi, use_container_width=True, height=400)
 
-    # ==========================================
+     # ==========================================
     # 5. CHỨC NĂNG XUẤT FILE EXCEL ĐẸP
     # ==========================================
     def export_to_excel_pretty(df_source):
@@ -222,58 +222,60 @@ if danh_sach_uv:
                 else:
                     cell.font = font_data
                     if cell.column == 2:
-                      cell.alignment = Alignment(vertical="center", horizontal="left")
-else:
-cell.alignment = Alignment(horizontal="center", vertical="center")
-for col_idx in range(1, ws.max_column + 1):
-col_letter = get_column_letter(col_idx)
-max_len = 0
-for row in range(1, ws.max_row + 1):
-val = ws.cell(row=row, column=col_idx).value
-if val:
-max_len = max(max_len, len(str(val)))
-ws.column_dimensions[col_letter].width = max(max_len + 4, 12)
-wb.save(output)
-return output.getvalue()
-st.write("")
-excel_data = export_to_excel_pretty(df_hien_thi)
-st.download_button(
-label="📥 Tải về Báo cáo Kết quả (Định dạng Excel có khung kẻ bảng)",
-data=excel_data,
-file_name="Ket_qua_kiem_phieu_chuan.xlsx",
-mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-use_container_width=True
-)
+                        cell.alignment = Alignment(vertical="center", horizontal="left")
+                    else:
+                        cell.alignment = Alignment(horizontal="center", vertical="center")
+                    
+        for col_idx in range(1, ws.max_column + 1):
+            col_letter = get_column_letter(col_idx)
+            max_len = 0
+            for row in range(1, ws.max_row + 1):
+                val = ws.cell(row=row, column=col_idx).value
+                if val:
+                    max_len = max(max_len, len(str(val)))
+            ws.column_dimensions[col_letter].width = max(max_len + 4, 12)
+            
+        wb.save(output)
+        return output.getvalue()
 
-==========================================
+    st.write("")
+    excel_data = export_to_excel_pretty(df_hien_thi)
+    st.download_button(
+        label="📥 Tải về Báo cáo Kết quả (Định dạng Excel có khung kẻ bảng)",
+        data=excel_data,
+        file_name="Ket_qua_kiem_phieu_chuan.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        use_container_width=True
+    )
 
-
-6. MỤC 3 - PHẦN CHỈNH SỬA VÀ ĐIỀU CHỈNH DỮ LIỆU
-
-
-==========================================
-
+# ==========================================
+# 6. MỤC 3 - PHẦN CHỈNH SỬA VÀ ĐIỀU CHỈNH DỮ LIỆU
+# ==========================================
 if danh_sach_uv:
-st.write("---")
-st.header("3. Điều chỉnh dữ liệu")
-danh_sach_ten_sua = [uv["ten"] for uv in danh_sach_uv]
-ten_can_sua = st.selectbox("Chọn ứng viên cần sửa số liệu hoặc xóa hẳn khỏi danh sách:", [""] + danh_sach_ten_sua, key="select_sua")
-if ten_can_sua:
-info_hien_tai = next(item for item in danh_sach_uv if item["ten"] == ten_can_sua)
-col_info, col_action = st.columns(2)
-with col_info:
-st.info(f"Ứng viên đang chọn: {ten_can_sua}  \nSố phiếu hiện tại trên hệ thống Cloud: {info_hien_tai['so_phieu']} phiếu.")
-so_phieu_moi = st.number_input("Nhập chính xác số phiếu thay thế mới:", min_value=0, value=int(info_hien_tai["so_phieu"]), step=1)
-with col_action:
-st.write("")
-col_btn_sua, col_btn_xoa = st.columns(2)
-with col_btn_sua:
-if st.button("💾 Lưu thay đổi số phiếu", use_container_width=True, type="primary"):
-supabase.table("ung_vien").update({"so_phieu": so_phieu_moi}).eq("ten", ten_can_sua).execute()
-st.success(f"Đã cập nhật số phiếu của {ten_can_sua} thành {so_phieu_moi} lên Cloud!")
-st.rerun()
-with col_btn_xoa:
-if st.button("🗑️ Xóa ứng viên này", use_container_width=True):
-supabase.table("ung_vien").delete().eq("ten", ten_can_sua).execute()
-st.warning(f"Đã xóa hoàn toàn ứng viên {ten_can_sua} khỏi cơ sở dữ liệu trực tuyến!")
-st.rerun()
+    st.write("---")
+    st.header("3. Điều chỉnh dữ liệu")
+    
+    danh_sach_ten_sua = [uv["ten"] for uv in danh_sach_uv]
+    ten_can_sua = st.selectbox("Chọn ứng viên cần sửa số liệu hoặc xóa hẳn khỏi danh sách:", [""] + danh_sach_ten_sua, key="select_sua")
+    
+    if ten_can_sua:
+        info_hien_tai = next(item for item in danh_sach_uv if item["ten"] == ten_can_sua)
+        col_info, col_action = st.columns(2)
+        
+        with col_info:
+            st.info(f"Ứng viên đang chọn: **{ten_can_sua}**  \nSố phiếu hiện tại trên hệ thống Cloud: **{info_hien_tai['so_phieu']}** phiếu.")
+            so_phieu_moi = st.number_input("Nhập chính xác số phiếu thay thế mới:", min_value=0, value=int(info_hien_tai["so_phieu"]), step=1)
+            
+        with col_action:
+            st.write("")
+            col_btn_sua, col_btn_xoa = st.columns(2)
+            with col_btn_sua:
+                if st.button("💾 Lưu thay đổi số phiếu", use_container_width=True, type="primary"):
+                    supabase.table("ung_vien").update({"so_phieu": so_phieu_moi}).eq("ten", ten_can_sua).execute()
+                    st.success(f"Đã cập nhật số phiếu của {ten_can_sua} thành {so_phieu_moi} lên Cloud!")
+                    st.rerun()
+            with col_btn_xoa:
+                if st.button("🗑️ Xóa ứng viên này", use_container_width=True):
+                    supabase.table("ung_vien").delete().eq("ten", ten_can_sua).execute()
+                    st.warning(f"Đã xóa hoàn toàn ứng viên {ten_can_sua} khỏi cơ sở dữ liệu trực tuyến!")
+                    st.rerun()
