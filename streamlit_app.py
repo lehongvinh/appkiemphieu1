@@ -12,7 +12,7 @@ from supabase import create_client, Client
 # 1. CẤU HÌNH TRANG WEB & TỰ ĐỘNG LÀM MỚI (REAL-TIME)
 # ==========================================
 st.set_page_config(page_title="Hệ thống Kiểm phiếu tự động", layout="wide")
-st.title("📊 Hệ thống Kiểm phiếu Tự động (Đồng bộ đa máy - Siêu tốc)")
+st.title("📊 Hệ thống Kiểm phiếu Tự động")
 
 # Tự động quét giao diện sau mỗi 3 giây. Chu kỳ này cũng được dùng để đẩy dữ liệu đệm lên Cloud
 st_autorefresh(interval=3000, key="datarefresh")
@@ -151,7 +151,7 @@ with col_test:
 # ==========================================
 if danh_sach_uv:
     st.write("---")
-    st.header("2. Kiểm phiếu & Bảng xếp hạng (Dữ liệu chung trực tuyến)")
+    st.header("2. Kiểm phiếu & Bảng xếp hạng")
     
     col_nhap_lieu, col_bxh = st.columns(2)
     
@@ -205,7 +205,7 @@ if danh_sach_uv:
                 
     with col_bxh:
         with st.container(border=True):
-            st.subheader("🏆 Bảng xếp hạng hiển thị")
+            st.subheader("Bảng xếp hạng")
             st.dataframe(df_hien_thi, use_container_width=True, height=400)
 
     # ==========================================
@@ -263,7 +263,7 @@ if danh_sach_uv:
     st.write("")
     excel_data = export_to_excel_pretty(df_hien_thi)
     st.download_button(
-        label="📥 Tải về Báo cáo Kết quả (Định dạng Excel có khung kẻ bảng)",
+        label="📥 TẢI VỀ ",
         data=excel_data,
         file_name="Ket_qua_kiem_phieu_chuan.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -298,7 +298,7 @@ if danh_sach_uv:
 
     # Bước 3: Hiển thị 1 O^ CHỌN DUY NHẤT. Bạn gõ không dấu thoải mái, màn hình chỉ hiện tên có dấu sạch 100%
     lua_chon_khoa_ngam = st.selectbox(
-        "Gõ tên ứng viên (không dấu) hoặc cuộn chuột để chọn người cần sửa/xóa:",
+        "Tên ứng viên cần sửa/xóa:",
         danh_sach_ngam_selectbox,
         format_func=hien_thi_ten_co_dau_sach_se,
         key="select_sua"
@@ -315,7 +315,7 @@ if danh_sach_uv:
         
         with col_info:
             st.info(f"Ứng viên đang chọn: **{ten_can_sua}**  \nSố phiếu hiện tại trên hệ thống Cloud: **{info_hien_tai['so_phieu']}** phiếu.")
-            so_phieu_moi = st.number_input("Nhập chính xác số phiếu thay thế mới:", min_value=0, value=int(info_hien_tai["so_phieu"]), step=1)
+            so_phieu_moi = st.number_input("Nhập số phiếu thay thế mới:", min_value=0, value=int(info_hien_tai["so_phieu"]), step=1)
             
         with col_action:
             st.write("")
