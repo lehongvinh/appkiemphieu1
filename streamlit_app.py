@@ -269,17 +269,39 @@ if danh_sach_uv:
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         use_container_width=True
     )
-    # ==========================================
+# ==========================================
 # 6. MỤC 3 - PHẦN CHỈNH SỬA VÀ ĐIỀU CHỈNH DỮ LIỆU
 # ==========================================
 if danh_sach_uv:
     st.write("---")
     st.header("3. Điều chỉnh dữ liệu")
     
-    danh_sach_ten_sua = [uv["ten"] for uv in danh_sach_uv]
-    ten_can_sua = st.selectbox("Chọn ứng viên cần sửa số liệu hoặc xóa hẳn khỏi danh sách:", [""] + danh_sach_ten_sua, key="select_sua")
+    # Bước 1: Tạo danh sách hiển thị đặc biệt: "Tên gốc (ten khong dau)" để selectbox tự lọc được khi gõ không dấu
+    danh_sach_hien_thi_selectbox = [""]
+    ban_do_ten_goc = {} # Dùng để dò ngược lại tên chính xác có dấu sau khi người dùng chọn
     
-    if len(ten_can_sua) > 0:
+    for uv in danh_sach_uv:
+        ten_co_dau = uv["ten"]
+        ten_khong_dau = unidecode(ten_co_dau).lower().strip()
+        # Chuỗi hiển thị trong thanh chọn sẽ có dạng: "Nguyễn Văn Tuấn (nguyen van tuan)"
+        chuoi_hien_thi = f"{ten_co_dau} ({ten_khong_dau})"
+        
+        danh_sach_hien_thi_selectbox.append(chuoi_hien_thi)
+        ban_do_ten_goc[chuoi_hien_thi] = ten_co_dau
+
+    # Bước 2: Hiển thị thanh chọn duy nhất. Bạn có thể gõ "tuan", "hoang" không dấu vào đây, droplist sẽ tự lọc
+    lua_chon_selectbox = st.selectbox(
+        "Gõ tên ứng viên (không dấu) hoặc cuộn chuột để chọn người cần sửa/xóa:",
+        danh_sach_hien_thi_selectbox,
+        key="select_sua"
+    )
+    
+    # Bước 3: Nếu người dùng đã chọn một ứng viên từ droplist
+    if len(lua_chon_selectbox) > 0:
+        # Lấy lại tên gốc có dấu chính xác từ bản đồ chuyển đổi
+        ten_can_sua = ban_do_ten_goc[lua_chon_selectbox]
+        
+        st.write("")
         info_hien_tai = next(item for item in danh_sach_uv if item["ten"] == ten_can_sua)
         col_info, col_action = st.columns(2)
         
